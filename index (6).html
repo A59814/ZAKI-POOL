@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Star Pool 3D</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap');
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Cairo',sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+canvas{display:block;position:absolute;inset:0}
+.layer{position:absolute;inset:0}
+#splash{background:#000;display:flex;justify-content:center;align-items:center;z-index:100;transition:opacity 1s}
+#splash h1{color:#f00;font-size:44px;text-shadow:0 0 20px red;opacity:0;animation:fadeIn 2s forwards}
+@keyframes fadeIn{to{opacity:1}}
+#menu{display:none;flex-direction:column;justify-content:space-between;z-index:50;background:rgba(0,0,0,.35)}
+.top-bar{display:flex;justify-content:space-between;padding:20px}
+.profile{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);backdrop-filter:blur(10px);padding:5px 15px;border-radius:20px;color:#fff;border:1px solid rgba(255,255,255,.2)}
+.center-menu{display:flex;flex-direction:column;align-items:center;gap:15px}
+.glass-btn{background:rgba(255,255,255,.1);backdrop-filter:blur(15px);border:1px solid rgba(255,255,255,.3);color:#fff;padding:14px 38px;border-radius:15px;font:700 20px 'Cairo',sans-serif;cursor:pointer;transition:.2s}
+.glass-btn:active{transform:scale(.95)}
+.bottom-menu{display:flex;justify-content:space-between;padding:30px;align-items:flex-end}
+.icon-btn{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.3);display:flex;justify-content:center;align-items:center;font-size:24px;cursor:pointer;color:#fff}
+#star-btn{width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,#ffd700,#ff8c00);border:4px solid #fff;box-shadow:0 0 30px #ffd700,inset 0 0 20px #fff;display:flex;justify-content:center;align-items:center;font-size:28px;font-weight:900;color:#fff;text-shadow:2px 2px 4px #000;cursor:pointer;animation:pulse 2s infinite}
+@keyframes pulse{50%{transform:scale(1.06);box-shadow:0 0 50px #ffd700,0 0 80px #ff8c00}}
+#game-ui{display:none;pointer-events:none;z-index:40}
+#hud{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;color:#fff;font-weight:900;font-size:18px;text-shadow:0 2px 6px #000}
+#back-btn{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));right:12px;width:40px;height:40px;font-size:20px;pointer-events:auto}
+#power-wrap{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:60%;height:14px;background:rgba(0,0,0,.5);border:2px solid #fff;border-radius:10px;overflow:hidden}
+#power-bar{width:0;height:100%;background:linear-gradient(90deg,#0f0,#ff0,#f00)}
+#settings-modal{background:rgba(0,0,0,.8);display:none;justify-content:center;align-items:center;z-index:60}
+.settings-content{background:rgba(30,30,40,.95);border:1px solid #555;padding:28px;border-radius:20px;display:flex;flex-direction:column;gap:12px;width:80%;max-width:400px}
+.settings-content h2{color:#fff;text-align:center;margin:0}
+.settings-content button{background:#333;color:#fff;border:0;padding:11px;border-radius:8px;font:700 16px 'Cairo',sans-serif;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="splash" class="layer"><h1>Star Pool</h1></div>
+
+<div id="menu" class="layer">
+  <div class="top-bar">
+    <div class="profile"><span style="font-size:24px">👤</span><div><div style="font-weight:700" data-i="p1">اللاعب 1</div><div style="font-size:12px;color:#ccc" data-i="lv">المستوى 1</div></div></div>
+    <div style="display:flex;gap:10px"><div class="profile">💰 0</div><div class="profile">💎 0</div></div>
+  </div>
+  <div class="center-menu">
+    <button class="glass-btn" onclick="startGame('challenge')" data-i="ch">🏆 التحديات</button>
+    <button class="glass-btn" onclick="startGame('ai')" data-i="ai">🤖 العب ضد الحاسوب</button>
+  </div>
+  <div class="bottom-menu">
+    <div class="icon-btn" onclick="openSettings()">⚙️</div>
+    <div id="star-btn" onclick="startGame('free')">STAR</div>
+    <div class="icon-btn">🛒</div>
+  </div>
+</div>
+
+<div id="game-ui" class="layer">
+  <div id="hud"></div>
+  <div id="back-btn" class="icon-btn" onclick="goToMenu()">↩</div>
+  <div id="power-wrap"><div id="power-bar"></div></div>
+</div>
+
+<div id="settings-modal" class="layer">
+  <div class="settings-content">
+    <h2 data-i="st">الإعدادات</h2>
+    <button onclick="changeLanguage('ar')">اللغة: العربية</button>
+    <button onclick="changeLanguage('en')">Language: English</button>
+    <button onclick="changeLanguage('fr')">Langue: Français</button>
+    <button id="sound-btn" onclick="toggleSound()"></button>
+    <button onclick="closeSettings()" style="background:#d32f2f" data-i="cl">إغلاق</button>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+ "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+ "cannon-es":"https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+
+const R = 0.6, HW = 6, HL = 12, RAIL = 1.2;           // نصف قطر الكرة، نصف عرض/طول الملعب، سماكة الحافة
+const COL = ['#f5c400','#0a3cc8','#d01818','#5b1a8c','#f07800','#0b7a2e','#7a1010','#111111'];
+const POCKETS = [[-HW,-HL],[HW,-HL],[-HW,0],[HW,0],[-HW,HL],[HW,HL]].map(([x,z]) => ({x, z, r: z === 0 ? 0.95 : 1.15}));
+
+const TXT = {
+  ar:{p1:'اللاعب 1',lv:'المستوى 1',ch:'🏆 التحديات',ai:'🤖 العب ضد الحاسوب',st:'الإعدادات',cl:'إغلاق',on:'الصوت: تشغيل',off:'الصوت: إيقاف',sc:'النقاط',me:'دورك',cpu:'دور الحاسوب',you:'أنت',pc:'الحاسوب',tm:'الوقت',end:'انتهى الوقت! نقاطك: '},
+  en:{p1:'Player 1',lv:'Level 1',ch:'🏆 Challenges',ai:'🤖 Play vs Computer',st:'Settings',cl:'Close',on:'Sound: On',off:'Sound: Off',sc:'Score',me:'Your turn',cpu:'Computer turn',you:'You',pc:'CPU',tm:'Time',end:'Time is up! Score: '},
+  fr:{p1:'Joueur 1',lv:'Niveau 1',ch:'🏆 Défis',ai:'🤖 Jouer contre l’ordi',st:'Paramètres',cl:'Fermer',on:'Son : activé',off:'Son : coupé',sc:'Score',me:'Votre tour',cpu:'Tour de l’ordi',you:'Vous',pc:'Ordi',tm:'Temps',end:'Temps écoulé ! Score : '}
+};
+let lang = 'ar', soundEnabled = true;
+try { lang = localStorage.getItem('sp_lang') || 'ar'; } catch(e) {}
+const $ = id => document.getElementById(id);
+
+let scene, camera, renderer, world, ballMat, balls = [], sinking = [], cue = null, aimLine;
+let mode = 'free', playing = false, aiming = false, shot = false, pot = 0, turn = 'me';
+let score = {me:0, cpu:0}, timeLeft = 0, timer = null, power = 0;
+
+// ---------- الصوت ----------
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+function beep(vol = .5, f0 = 400) {
+  if (!soundEnabled) return;
+  try {
+    const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(100, t + .1);
+    g.gain.setValueAtTime(Math.min(vol, .8), t); g.gain.exponentialRampToValueAtTime(.01, t + .1);
+    o.connect(g); g.connect(AC.destination); o.start(); o.stop(t + .1);
+  } catch(e) {}
+}
+
+// ---------- المحرك ----------
+function initEngine() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050505);
+  camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, .1, 500);
+  renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+  sun.position.set(4, 30, 8); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, {left:-16, right:16, top:16, bottom:-16, near:1, far:60});
+  scene.add(sun);
+
+  world = new CANNON.World({gravity: new CANNON.Vec3(0, 0, 0)});   // لعبة مستوية: لا حاجة للجاذبية
+  ballMat = new CANNON.Material('ball');
+  const railMat = new CANNON.Material('rail');
+  world.addContactMaterial(new CANNON.ContactMaterial(ballMat, ballMat, {friction: 0, restitution: .95}));
+  world.addContactMaterial(new CANNON.ContactMaterial(ballMat, railMat, {friction: 0, restitution: .75}));
+
+  // الطاولة
+  const felt = new THREE.Mesh(new THREE.BoxGeometry(HW*2, .4, HL*2), new THREE.MeshStandardMaterial({color: 0x0b6e3a, roughness: .9}));
+  felt.position.y = -.2; felt.receiveShadow = true; scene.add(felt);
+  const wood = new THREE.MeshStandardMaterial({color: 0x4a2a14, roughness: .35, metalness: .2});
+  const rails = [[0,-(HL+RAIL/2),HW*2+RAIL*2,RAIL],[0,HL+RAIL/2,HW*2+RAIL*2,RAIL],[-(HW+RAIL/2),0,RAIL,HL*2],[HW+RAIL/2,0,RAIL,HL*2]];
+  rails.forEach(([x,z,w,d]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, .8, d), wood);
+    m.position.set(x, .4, z); m.castShadow = m.receiveShadow = true; scene.add(m);
+    const b = new CANNON.Body({mass: 0, material: railMat, shape: new CANNON.Box(new CANNON.Vec3(w/2, .5, d/2)), position: new CANNON.Vec3(x, .5, z)});
+    world.addBody(b);
+  });
+  POCKETS.forEach(p => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(p.r, 32), new THREE.MeshBasicMaterial({color: 0}));
+    m.rotation.x = -Math.PI/2; m.position.set(p.x, .02, p.z); scene.add(m);
+  });
+
+  // خط التصويب
+  aimLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({color: 0xffffff, transparent: true, opacity: .8}));
+  aimLine.visible = false; aimLine.frustumCulled = false; scene.add(aimLine);
+  fit();
+}
+
+// الكاميرا: الطاولة تملأ 95% من الشاشة
+function fit() {
+  const w = innerWidth, h = innerHeight, a = w / h, land = a > 1;
+  renderer.setSize(w, h); camera.aspect = a;
+  const ow = HW*2 + RAIL*2, ol = HL*2 + RAIL*2, t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const across = land ? ol : ow, up = land ? ow : ol;      // الأفقي / العمودي على الشاشة
+  const d = Math.max(across / (.95 * a * 2 * t), up / (.95 * 2 * t)) + .8;
+  camera.position.set(0, d, 0);
+  camera.up.set(land ? 1 : 0, 0, land ? 0 : -1);
+  camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
+}
+
+// ---------- الكرات ----------
+function ballTex(n) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const g = c.getContext('2d'), col = COL[(n - 1) % 8];
+  g.fillStyle = n > 8 ? '#fff' : col; g.fillRect(0, 0, 256, 128);
+  if (n > 8) { g.fillStyle = col; g.fillRect(0, 32, 256, 64); }
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 28px sans-serif';
+  for (const x of [64, 192]) {
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(x, 64, 22, 0, 7); g.fill();
+    g.fillStyle = '#000'; g.fillText(n, x, 66);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const ballGeo = () => new THREE.SphereGeometry(R, 32, 32);
+function addBall(x, z, n) {
+  const mat = n ? new THREE.MeshPhysicalMaterial({map: ballTex(n), roughness: .15, clearcoat: 1})
+                : new THREE.MeshPhysicalMaterial({color: 0xffffff, roughness: .15, clearcoat: 1});
+  const mesh = new THREE.Mesh(ballGeo(), mat);
+  mesh.castShadow = true; mesh.position.set(x, R, z); scene.add(mesh);
+  const body = new CANNON.Body({mass: 1, material: ballMat, shape: new CANNON.Sphere(R),
+    position: new CANNON.Vec3(x, R, z), linearDamping: .55});
+  body.linearFactor.set(1, 0, 1); body.angularFactor.set(0, 0, 0);
+  body.addEventListener('collide', e => {
+    const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
+    if (v > 1) beep(v / 25);
+  });
+  world.addBody(body);
+  const b = {mesh, body, n}; balls.push(b); return b;
+}
+function clearBalls() {
+  balls.concat(sinking).forEach(b => { world.removeBody(b.body); scene.remove(b.mesh); });
+  balls = []; sinking = []; cue = null;
+}
+function setup() {
+  clearBalls();
+  cue = addBall(0, 8, 0);
+  const nums = []; for (let i = 1; i <= 15; i++) if (i !== 8) nums.push(i);
+  nums.sort(() => Math.random() - .5); nums.splice(4, 0, 8);   // الكرة 8 في المنتصف
+  let i = 0;
+  for (let r = 0; r < 5; r++) for (let c = 0; c <= r; c++)
+    addBall((c - r / 2) * 2 * R * 1.01, -6 - r * R * 1.75, nums[i++]);
+}
+
+// ---------- منطق اللعب ----------
+function hud() {
+  const T = TXT[lang]; let s = '';
+  if (mode === 'ai') s = `${T.you} ${score.me} - ${score.cpu} ${T.pc} • ${turn === 'me' ? T.me : T.cpu}`;
+  else if (mode === 'challenge') s = `${T.sc}: ${score.me} • ${T.tm}: ${timeLeft}`;
+  else s = `${T.sc}: ${score.me}`;
+  $('hud').textContent = s;
+}
+function startGame(m) {
+  if (AC.state === 'suspended') AC.resume();
+  mode = m; score = {me: 0, cpu: 0}; turn = 'me'; shot = false; pot = 0;
+  $('menu').style.display = 'none'; $('game-ui').style.display = 'block';
+  setup(); playing = true;
+  clearInterval(timer);
+  if (m === 'challenge') {
+    timeLeft = 60;
+    timer = setInterval(() => {
+      if (--timeLeft <= 0) { clearInterval(timer); const s = score.me; hud(); setTimeout(() => { alert(TXT[lang].end + s); goToMenu(); }, 100); }
+      hud();
+    }, 1000);
+  }
+  hud();
+}
+function goToMenu() {
+  clearInterval(timer); playing = false; aiming = false; aimLine.visible = false;
+  $('game-ui').style.display = 'none'; $('menu').style.display = 'flex';
+  setup();
+}
+function shoot(dx, dz, p) {
+  const l = Math.hypot(dx, dz) || 1, s = 8 + p * 40;
+  cue.body.velocity.set(dx / l * s, 0, dz / l * s);
+  shot = true; pot = 0; beep(.6, 500);
+}
+function afterShot() {
+  const scratch = !cue || !balls.includes(cue);
+  if (scratch) {
+    let x = 0; while (balls.some(b => Math.hypot(b.body.position.x - x, b.body.position.z - 8) < 2*R + .1)) x += 1.4;
+    cue = addBall(Math.min(x, HW - R), 8, 0);
+  }
+  if (balls.length === 1) { setup(); }
+  if (mode === 'ai') {
+    if (!pot || scratch) turn = turn === 'me' ? 'cpu' : 'me';
+    if (turn === 'cpu') setTimeout(aiShoot, 1100);
+  }
+  hud();
+}
+function aiShoot() {
+  if (!playing || turn !== 'cpu' || shot) return;
+  const targets = balls.filter(b => b !== cue);
+  if (!targets.length) return;
+  const cp = cue.body.position; let best = null, bd = 1e9;
+  targets.forEach(b => POCKETS.forEach(p => {
+    const bp = b.body.position, vx = p.x - bp.x, vz = p.z - bp.z, l = Math.hypot(vx, vz) || 1;
+    const gx = bp.x - vx / l * 2 * R, gz = bp.z - vz / l * 2 * R;
+    const d = Math.hypot(gx - cp.x, gz - cp.z) + l;
+    if (d < bd) { bd = d; best = {gx, gz}; }
+  }));
+  const ang = Math.atan2(best.gz - cp.z, best.gx - cp.x) + (Math.random() - .5) * .06;
+  shoot(Math.cos(ang), Math.sin(ang), .45 + Math.random() * .4);
+}
+
+// ---------- التحكم (ماوس / لمس) ----------
+const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -R), m2 = new THREE.Vector2(), hit = new THREE.Vector3();
+function toWorld(e) {
+  m2.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1);
+  ray.setFromCamera(m2, camera);
+  return ray.ray.intersectPlane(plane, hit) ? hit : null;
+}
+let aimDir = null;
+function updAim(e) {
+  const p = toWorld(e); if (!p || !cue) return;
+  const c = cue.body.position, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz);
+  if (dist < .4) { aimDir = null; aimLine.visible = false; power = 0; $('power-bar').style.width = '0'; return; }
+  power = Math.min(dist / 9, 1); aimDir = {x: dx / dist, z: dz / dist};
+  const len = 3 + power * 8, a = aimLine.geometry.attributes.position;
+  a.setXYZ(0, c.x, R, c.z); a.setXYZ(1, c.x + aimDir.x * len, R, c.z + aimDir.z * len); a.needsUpdate = true;
+  aimLine.visible = true; $('power-bar').style.width = (power * 100) + '%';
+}
+addEventListener('pointerdown', e => {
+  if (AC.state === 'suspended') AC.resume();
+  if (!playing || shot || turn !== 'me' || e.target.closest('#back-btn')) return;
+  aiming = true; aimDir = null; updAim(e);
+});
+addEventListener('pointermove', e => { if (aiming) updAim(e); });
+addEventListener('pointerup', () => {
+  if (!aiming) return; aiming = false; aimLine.visible = false;
+  if (aimDir && power > .05) shoot(aimDir.x, aimDir.z, power);
+  power = 0; aimDir = null; $('power-bar').style.width = '0';
+});
+
+// ---------- حلقة العرض ----------
+const axis = new THREE.Vector3(); let last = 0;
+function animate(t) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((t - last) / 1000 || 0, .05); last = t;
+  world.step(1 / 120, dt, 8);
+
+  let moving = false;
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i], v = b.body.velocity, sp = Math.hypot(v.x, v.z);
+    if (sp < .25) { v.set(0, 0, 0); } else {
+      moving = true;
+      axis.set(-v.z, 0, v.x).normalize(); b.mesh.rotateOnWorldAxis(axis, sp * dt / R);
+    }
+    b.body.position.y = R;
+    b.mesh.position.set(b.body.position.x, R, b.body.position.z);
+    // الجيوب
+    for (const p of POCKETS) {
+      if (Math.hypot(b.body.position.x - p.x, b.body.position.z - p.z) < p.r) {
+        balls.splice(i, 1); world.removeBody(b.body); sinking.push(b);
+        if (b !== cue) { pot++; score[mode === 'ai' ? turn : 'me']++; hud(); }
+        beep(.4, 250); break;
+      }
+    }
+  }
+  for (let i = sinking.length - 1; i >= 0; i--) {
+    const b = sinking[i]; b.mesh.position.y -= .06; b.mesh.scale.multiplyScalar(.9);
+    if (b.mesh.scale.x < .1) { scene.remove(b.mesh); sinking.splice(i, 1); }
+  }
+  if (shot && !moving) { shot = false; afterShot(); }
+  renderer.render(scene, camera);
+}
+
+// ---------- الواجهة ----------
+function applyLang() {
+  const T = TXT[lang];
+  document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-i]').forEach(el => el.textContent = T[el.dataset.i]);
+  $('sound-btn').textContent = soundEnabled ? T.on : T.off; hud();
+}
+function changeLanguage(l) { lang = l; try { localStorage.setItem('sp_lang', l); } catch(e) {} applyLang(); }
+function toggleSound() { soundEnabled = !soundEnabled; applyLang(); }
+function openSettings() { $('settings-modal').style.display = 'flex'; }
+function closeSettings() { $('settings-modal').style.display = 'none'; }
+// الدوال داخل module لا تُرى من onclick، لذلك نربطها بـ window
+Object.assign(window, {startGame, goToMenu, openSettings, closeSettings, toggleSound, changeLanguage});
+
+addEventListener('resize', () => renderer && fit());
+addEventListener('orientationchange', () => setTimeout(() => renderer && fit(), 200));
+
+initEngine(); setup(); applyLang(); requestAnimationFrame(animate);
+setTimeout(() => {
+  $('splash').style.opacity = 0;
+  setTimeout(() => { $('splash').style.display = 'none'; $('menu').style.display = 'flex'; }, 1000);
+}, 2500);
+
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
